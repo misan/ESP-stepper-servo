@@ -8,7 +8,6 @@
  * both serial 115200 and UDP 9999 accept g-code 
  */  
 
-#define MAXI 30
 #define VERSION        (1)  // firmware version
 #define BAUD           (115200)  // How fast is the Arduino talking?
 #define MAX_BUF        (64)  // What is the longest message Arduino can store?
@@ -16,12 +15,8 @@
 #define MAX_FEEDRATE   (50000) 
 #define MIN_FEEDRATE   (0.01)
 
-#define STEPS_MM  80
+#define STEPS_MM       80
 
-
-int ACCEL =    1500 ;  // mm/s^2
-
-boolean flip = false;
 // for arc directions
 #define ARC_CW          (1)
 #define ARC_CCW         (-1)
@@ -32,25 +27,25 @@ boolean flip = false;
 #include <WiFiUdp.h>
 #include <WiFiClient.h>
 #include <WiFiServer.h>
+
+
 const char* SSID_NAME = "ESP8266AP";  // WiFi AP SSID Name
 const char* SSID_PASS = "0123456789"; // WiFi AP SSID Password
-WiFiUDP port;
 unsigned int localPort = 9999;
-
 WiFiServer server(9999);
 WiFiClient client;
+WiFiUDP port;
 
+int ACCEL =    1500 ;  // mm/s^2
+boolean flip = false;
 int i = 1;
-
 long last=0;
 int servo=1500;
-
 float factor, v2 = 0;
 
 
 // interrupt triggered by timer expiring
 // motion will happen here based on a few variables
-
 volatile int cs=0; // current step
 long accel_steps=1000; // how many steps during acceleration
 long coast_steps=40000; // how many steps during coasting
