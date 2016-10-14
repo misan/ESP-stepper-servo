@@ -344,6 +344,12 @@ void help() {
   Serial.println(F("M100; - this help message"));
   Serial.println(F("M114; - report position and feedrate"));
   Serial.println(F("All commands must end with a newline."));
+  // Print the IP address
+  Serial.print("Use this URL to connect: http://");
+  Serial.print(WiFi.softAPIP());
+  Serial.print(':');
+  Serial.print(localPort);
+  Serial.println('/');
 }
 
 
@@ -406,6 +412,8 @@ void ready() {
 
 
 void setup() {
+  Serial.begin(BAUD);  // open coms
+  
   pinMode(D2, OUTPUT);  // stepX
   pinMode(D13, OUTPUT); //dirX
   pinMode(D8, OUTPUT); // enable
@@ -420,16 +428,10 @@ void setup() {
   WiFi.softAP(SSID_NAME, SSID_PASS);
   port.begin(localPort);
 
-  Serial.begin(BAUD);  // open coms
-
   //  setup_controller();  
   position(0,0);  // set staring position
   feedrate((MAX_FEEDRATE + MIN_FEEDRATE)/2);  // set default speed
 
-  help();  // say hello
-  ready();
-
-  
   noInterrupts();
   timer0_isr_init();
   timer0_attachInterrupt(itr);
@@ -440,8 +442,11 @@ void setup() {
   timer1_enable(TIM_DIV16, TIM_EDGE, TIM_SINGLE);
   timer1_write(servo*5);
   interrupts();
+
   server.begin(); // start TCP server
-  
+
+  help();  // say hello
+  ready();
 }
 
 
