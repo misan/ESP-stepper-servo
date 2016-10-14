@@ -72,7 +72,6 @@ void itr1(void) {
 }
 
 void itr (void) {
-  //digitalWrite(BUILTIN_LED,!digitalRead(BUILTIN_LED));
   if( cs >= total_steps ) {busy = false; timer0_write(ESP.getCycleCount() + 80000000L/100);  } // no more interrupts scheduled
   else { // I have to move the motors
     cs++;
@@ -93,7 +92,6 @@ void itr (void) {
     timer0_write(ESP.getCycleCount() + (long) (20000000L*cn) );  // schedule next pulse
 
     if(dx>dy) {
-      over=dx/2;
       digitalWrite(D2, HIGH);
       over+=dy;
       if(over>=dx) {
@@ -102,7 +100,6 @@ void itr (void) {
       }
       delayMicroseconds(1);
     } else {
-    over=dy/2;
       digitalWrite(D15, HIGH);
       over+=dx;
       if(over>=dy) {
