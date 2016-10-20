@@ -162,11 +162,11 @@ void pause(long ms) {
 void feedrate(float nfr) {
   if(fr==nfr) return;  // same as last time?  quit now.
   if(nfr>MAX_FEEDRATE || nfr<MIN_FEEDRATE) {  // don't allow crazy feed rates
-    Serial.print(F("New feedrate must be greater than "));
-    Serial.print(MIN_FEEDRATE);
-    Serial.print(F("steps/s and less than "));
-    Serial.print(MAX_FEEDRATE);
-    Serial.println(F("steps/s."));
+    print(("New feedrate must be greater than "));
+    print(MIN_FEEDRATE);
+    print(("steps/s and less than "));
+    print(MAX_FEEDRATE);
+    println(("steps/s."));
     return;
   }
   step_delay = 1000000.0/nfr;
@@ -303,8 +303,8 @@ float parsenumber(char code,float val) {
  * @input val the float.
  */
 void output(const char *code,float val) {
-  Serial.print(code);
-  Serial.println(val);
+  print(code);
+  println(val);
 }
 
 
@@ -315,7 +315,7 @@ void where() {
   output("X",px);
   output("Y",py);
   output("F",fr);
-  Serial.println(mode_abs?"ABS":"REL");
+  println(mode_abs?"ABS":"REL");
 } 
 
 
@@ -409,6 +409,14 @@ void print(const char *msg) {
 
 
 void println(const char *msg) {
+  Serial.println(msg);
+  if(client && client.connected()) {
+    client.println(msg);
+  }
+}
+
+
+void println(float msg) {
   Serial.println(msg);
   if(client && client.connected()) {
     client.println(msg);
@@ -515,6 +523,7 @@ void loop() {
       client.print(c); 
       if(sofar<MAX_BUF-1) buffer[sofar++]=c;
       if((c=='\n') || (c == '\r')) {
+        client.print("\n");
         buffer[sofar]=0;
         busy=true;
         processCommand();  // do something with the command
