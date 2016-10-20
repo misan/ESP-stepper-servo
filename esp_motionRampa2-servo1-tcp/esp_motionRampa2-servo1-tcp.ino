@@ -9,7 +9,7 @@
  */  
 
 #define VERSION        (1)  // firmware version
-#define BAUD           (115200)  // How fast is the Arduino talking?
+#define BAUD           (57600)  // How fast is the Arduino talking?
 #define MAX_BUF        (64)  // What is the longest message Arduino can store?
 #define STEPS_PER_TURN (400)  // depends on your stepper motor.  most are 200.
 #define MAX_FEEDRATE   (50000) 
@@ -28,11 +28,10 @@
 #include <WiFiClient.h>
 #include <WiFiServer.h>
 
-
-const char* SSID_NAME = "ESP8266AP";  // WiFi AP SSID Name
-const char* SSID_PASS = "0123456789"; // WiFi AP SSID Password
+char SSID_NAME[64];  // WiFi AP SSID Name
+char SSID_PASS[64];  // WiFi AP SSID Password
 unsigned int localPort = 9999;
-WiFiServer server(9999);
+WiFiServer server(localPort);
 WiFiClient client;
 WiFiUDP port;
 
@@ -324,27 +323,21 @@ void where() {
  * display helpful information
  */
 void help() {
-  Serial.print(F("GcodeCNCDemo2AxisV1 "));
-  Serial.println(VERSION);
-  Serial.println(F("Commands:"));
-  Serial.println(F("G00 [X(steps)] [Y(steps)] [F(feedrate)]; - line"));
-  Serial.println(F("G01 [X(steps)] [Y(steps)] [F(feedrate)]; - line"));
-  Serial.println(F("G02 [X(steps)] [Y(steps)] [I(steps)] [J(steps)] [F(feedrate)]; - clockwise arc"));
-  Serial.println(F("G03 [X(steps)] [Y(steps)] [I(steps)] [J(steps)] [F(feedrate)]; - counter-clockwise arc"));
-  Serial.println(F("G04 P[seconds]; - delay"));
-  Serial.println(F("G90; - absolute mode"));
-  Serial.println(F("G91; - relative mode"));
-  Serial.println(F("G92 [X(steps)] [Y(steps)]; - change logical position"));
-  Serial.println(F("M18; - disable motors"));
-  Serial.println(F("M100; - this help message"));
-  Serial.println(F("M114; - report position and feedrate"));
-  Serial.println(F("All commands must end with a newline."));
+  print(("\n\nHELLO WORLD! I AM DRAWBOT #1"));
+  println("\nFirmware v7");
+  println(("== http://www.makelangelo.com/ =="));
+  println(("M100 - display this message"));
+  println(("M101 [Tx.xx] [Bx.xx] [Rx.xx] [Lx.xx]"));
+  println(("       - display/update board dimensions."));
+  println(("As well as the following G-codes (http://en.wikipedia.org/wiki/G-code):"));
+  println(("G00,G01,G02,G03,G04,G28,G90,G91,G92,M18,M114"));
+  println(("All commands must end with a newline."));
   // Print the IP address
   Serial.print("Use this URL to connect: http://");
-  Serial.print(WiFi.softAPIP());
-  Serial.print(':');
+  Serial.print(WiFi.localIP());
+  Serial.print(":");
   Serial.print(localPort);
-  Serial.println('/');
+  Serial.println("/");
 }
 
 
@@ -389,18 +382,45 @@ void processCommand() {
     break;
   case 100:  help();  break;
   case 114:  where();  break;
-  case 201: ACCEL = parsenumber('A',0); feedrate(fr); Serial.print(ACCEL); break; // M201 A<accel> change acceleration
+  case 201: // M201 A<accel> change acceleration
+    ACCEL = parsenumber('A',ACCEL);
+    feedrate(fr);
+    print(ACCEL);
+    break;
   default:  break;
   }
 }
 
+
+void print(int msg) {
+  Serial.print(msg);
+  if(client && client.connected()) {
+    client.print(msg);
+  }
+}
+
+
+void print(const char *msg) {
+  Serial.print(msg);
+  if(client && client.connected()) {
+    client.print(msg);
+  }
+}
+
+
+void println(const char *msg) {
+  Serial.println(msg);
+  if(client && client.connected()) {
+    client.println(msg);
+  }
+}
 
 /**
  * prepares the input buffer to receive a new message and tells the serial connected device it is ready for more.
  */
 void ready() {
   sofar=0;  // clear input buffer
-  Serial.print(F(">"));  // signal ready to receive input
+  print(">");  // signal ready to receive input
 }
 
 
@@ -419,8 +439,18 @@ void setup() {
   digitalWrite(D8, LOW);
   digitalWrite(D14, LOW);
 
+  strcpy(SSID_NAME,"CSIS VAN #1");
+  strcpy(SSID_PASS, "TDPJYGZEDH123");
+  Serial.print(F("Connecting to "));  Serial.print(SSID_NAME);
+  Serial.print(F(", "));  Serial.println(SSID_PASS);
+
   WiFi.mode(WIFI_AP);
-  WiFi.softAP(SSID_NAME, SSID_PASS);
+  WiFi.begin(SSID_NAME, SSID_PASS);
+  // wait for connection
+  while(WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
   port.begin(localPort);
 
   //  setup_controller();  
@@ -449,19 +479,6 @@ char c;
 long lastping;
 
 void loop() {
-  /*
-  int packetSize = port.parsePacket();
-  if (packetSize) {
-    int len = port.read(buffer, 255); sofar=len; 
-    if (len > 0) buffer[len-1] = 0; 
-    Serial.println(buffer);
-    processCommand();
-    port.beginPacket(port.remoteIP(),port.remotePort());
-    port.write("ok\r\n");
-    port.endPacket();
-  }
-  */
-
  if(millis()-lastping>5000 && !client) { // only till first client connects
   lastping=millis();
   port.beginPacket("255.255.255.255",9999);
@@ -478,25 +495,30 @@ void loop() {
       buffer[sofar]=0;  // end the buffer so string functions work right
       Serial.print(F("\r\n"));  // echo a return character for humans
       if(sofar>3) {
-                  busy=true;
-                  processCommand();  // do something with the command
-                  ready(); 
-                  }
+        busy=true;
+        processCommand();  // do something with the command
+        ready(); 
+      }
     } 
   } 
-  if(server.hasClient()){
-    client=server.available();  // it will destroy a previous connection !!!
-    Serial.println("TCP Client accepted");
+  if( (!client || !client.connected()) && server.hasClient() ) {
+    client = server.available();
+    Serial.print("TCP Client accepted from");
+    Serial.print(client.remoteIP());
+    Serial.print(':');
+    Serial.println(client.remotePort());
   }
-  if(client && client.connected()) {
+  
+  if( client && client.connected()) {
     while(client.available()>0) {// if data available,let's hope it is the full command
-      buffer[sofar++]=(c=client.read()); Serial.print(c); 
+      c=client.read();
+      client.print(c); 
+      if(sofar<MAX_BUF-1) buffer[sofar++]=c;
       if((c=='\n') || (c == '\r')) {
         buffer[sofar]=0;
         busy=true;
         processCommand();  // do something with the command
-        ready(); 
-        client.println("ok");
+        ready();
       }
     }
   }
