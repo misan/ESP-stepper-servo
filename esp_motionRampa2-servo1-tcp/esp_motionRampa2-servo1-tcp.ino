@@ -23,6 +23,13 @@
 // Arcs are split into many line segments.  How long are the segments?
 #define MM_PER_SEGMENT  (1)
 
+#define STEP_X      D2
+#define STEP_Y      D15
+#define DIR_X       D13
+#define DIR_Y       D12
+#define ENABLE_PIN  D8
+#define SERVO_PIN   D14
+
 #include <ESP8266WiFi.h>
 #include <WiFiUdp.h>
 #include <WiFiClient.h>
@@ -59,21 +66,24 @@ volatile boolean busy = false;
 
 void itr1(void) {
   if(flip) {
-    digitalWrite(D14,LOW);
+    digitalWrite(SERVO_PIN,LOW);
     flip = false;
     timer1_write(20000 * 5); // 20 ms between pulses
   }
   else {
     timer1_write(servo*5);
     flip = true;
-    digitalWrite(D14,HIGH);
+    digitalWrite(SERVO_PIN,HIGH);
   }
 }
 
 void itr (void) {
   //digitalWrite(BUILTIN_LED,!digitalRead(BUILTIN_LED));
-  if( cs >= total_steps ) {busy = false; timer0_write(ESP.getCycleCount() + 80000000L/100);  } // no more interrupts scheduled
-  else { // I have to move the motors
+  if( cs >= total_steps ) {
+    // no more interrupts scheduled
+    busy = false; 
+    timer0_write(ESP.getCycleCount() + 80000000L/100);  
+  } else { // I have to move the motors
     cs++;
     if( cs < accel_steps ) {
       // acceleration
@@ -92,26 +102,28 @@ void itr (void) {
     timer0_write(ESP.getCycleCount() + (long) (20000000L*cn) );  // schedule next pulse
 
     if(dx>dy) {
+      digitalWrite(STEP_X , LOW);  
       over=dx/2;
-      digitalWrite(D2, HIGH);
+      digitalWrite(STEP_X, HIGH);
       over+=dy;
       if(over>=dx) {
+        digitalWrite(STEP_Y, LOW);
         over-=dx;
-        digitalWrite(D15, HIGH);
+        digitalWrite(STEP_Y, HIGH);
       }
-      delayMicroseconds(1);
+      //delayMicroseconds(1);
     } else {
-    over=dy/2;
-      digitalWrite(D15, HIGH);
+      digitalWrite(STEP_Y, LOW);
+      over=dy/2;
+      digitalWrite(STEP_Y, HIGH);
       over+=dx;
       if(over>=dy) {
+        digitalWrite(STEP_X , LOW);  
         over-=dy;
-        digitalWrite(D2, HIGH);
+        digitalWrite(STEP_X, HIGH);
       }
-      delayMicroseconds(1);
-  }
-  digitalWrite(D15, LOW);
-  digitalWrite(D2 , LOW);   
+      //delayMicroseconds(1);
+    }
   } 
 }
 
@@ -210,12 +222,13 @@ void line(float newx,float newy) {
   float ea = ( fr / 60.0 ) * ta / 2 ;
   accel_steps = _min(ea * STEPS_MM , total_steps/2); // just in case feedrate cannot be reached 
   coast_steps = total_steps - accel_steps * 2; // acceleration
-  digitalWrite(D13, dirx); // direction of X motor
-  digitalWrite(D12, diry);
+  digitalWrite(DIR_X, dirx); // direction of X motor
+  digitalWrite(DIR_Y, diry);
   cs = 0; // let the motion start :-)
   cn = t0;
 
-  if(dx>dy) over=dx/2; else over=dy/2;
+  if(dx>dy) over=dx/2; 
+  else over=dy/2;
   busy=true;
   // wait till the command ends
   while(busy) { /*doServo();*/ delay(0); }
@@ -389,6 +402,12 @@ void processCommand() {
     break;
   default:  break;
   }
+
+  cmd = parsenumber('D',-1);
+  switch(cmd) {
+    case 10: println("D10 V0");  break;
+  default: break;
+  }
 }
 
 
@@ -401,6 +420,22 @@ void print(int msg) {
 
 
 void print(const char *msg) {
+  Serial.print(msg);
+  if(client && client.connected()) {
+    client.print(msg);
+  }
+}
+
+
+void print(const char msg) {
+  Serial.print(msg);
+  if(client && client.connected()) {
+    client.print(msg);
+  }
+}
+
+
+void print(const double msg) {
   Serial.print(msg);
   if(client && client.connected()) {
     client.print(msg);
@@ -428,7 +463,7 @@ void println(float msg) {
  */
 void ready() {
   sofar=0;  // clear input buffer
-  print(">");  // signal ready to receive input
+  print("> \n");  // signal ready to receive input
 }
 
 
@@ -437,19 +472,19 @@ void ready() {
 void setup() {
   Serial.begin(BAUD);  // open coms
   
-  pinMode(D2, OUTPUT);  // stepX
-  pinMode(D13, OUTPUT); //dirX
-  pinMode(D8, OUTPUT); // enable
-  pinMode(D15, OUTPUT); // stepY
-  pinMode(D12, OUTPUT); // dirY
-  pinMode(D14, OUTPUT); // servo
+  pinMode(STEP_X, OUTPUT);  // stepX
+  pinMode(DIR_X, OUTPUT); //dirX
+  pinMode(ENABLE_PIN, OUTPUT); // enable
+  pinMode(STEP_Y, OUTPUT); // stepY
+  pinMode(DIR_Y, OUTPUT); // dirY
+  pinMode(SERVO_PIN, OUTPUT); // servo
   //pinMode(BUILTIN_LED,OUTPUT);
-  digitalWrite(D8, LOW);
-  digitalWrite(D14, LOW);
+  digitalWrite(ENABLE_PIN, LOW);
+  digitalWrite(SERVO_PIN, LOW);
 
   strcpy(SSID_NAME,"CSIS VAN #1");
   strcpy(SSID_PASS, "TDPJYGZEDH123");
-  Serial.print(F("Connecting to "));  Serial.print(SSID_NAME);
+  Serial.print(F("\n\nConnecting to "));  Serial.print(SSID_NAME);
   Serial.print(F(", "));  Serial.println(SSID_PASS);
 
   WiFi.mode(WIFI_AP);
@@ -496,12 +531,12 @@ void loop() {
   
   while(Serial.available() > 0 ) {  // if something is available
     c=Serial.read();  // get it
-    Serial.print(c);  // repeat it back so I know you got the message
+    print(c);  // repeat it back so I know you got the message
     if(sofar<MAX_BUF-1) buffer[sofar++]=c;  // store it
     if((c=='\n') || (c == '\r')) {
       // entire message received
       buffer[sofar]=0;  // end the buffer so string functions work right
-      Serial.print(F("\r\n"));  // echo a return character for humans
+      print("\n");  // echo a return character for humans
       if(sofar>3) {
         busy=true;
         processCommand();  // do something with the command
@@ -511,19 +546,21 @@ void loop() {
   } 
   if( (!client || !client.connected()) && server.hasClient() ) {
     client = server.available();
-    Serial.print("TCP Client accepted from");
+    Serial.print("Client accepted from ");
     Serial.print(client.remoteIP());
     Serial.print(':');
     Serial.println(client.remotePort());
+    help();
+    ready();
   }
   
   if( client && client.connected()) {
     while(client.available()>0) {// if data available,let's hope it is the full command
       c=client.read();
-      client.print(c); 
+      Serial.print(c); 
       if(sofar<MAX_BUF-1) buffer[sofar++]=c;
       if((c=='\n') || (c == '\r')) {
-        client.print("\n");
+        Serial.print("\n");
         buffer[sofar]=0;
         busy=true;
         processCommand();  // do something with the command
