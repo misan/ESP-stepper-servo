@@ -20,7 +20,7 @@
 //------------------------------------------------------------------------------
 // GLOBALS
 //------------------------------------------------------------------------------
-
+extern int servo; // comes from Servo
 // robot UID
 int robot_uid=0;
 
@@ -739,14 +739,15 @@ void processCommand() {
 
   cmd=parseNumber('M',-1);
   switch(cmd) {
-  case 6:  tool_change(parseNumber('T',current_tool));  break;
-  case 17:  motor_engage();  break;
-  case 18:  motor_disengage();  break;
-  case 100:  help();  break;
-  case 101:  processConfig();  break;
-  case 110:  line_number = parseNumber('N',line_number);  break;
-  case 114:  where();  break;
-  default:  break;
+    case 3:  servo = ( parseNumber('S',1500) ); break; // sets the servo value in microseconds, it only works while inside loop :-(
+    case 6:  tool_change(parseNumber('T',current_tool));  break;
+    case 17:  motor_engage();  break;
+    case 18:  motor_disengage();  break;
+    case 100:  help();  break;
+    case 101:  processConfig();  break;
+    case 110:  line_number = parseNumber('N',line_number);  break;
+    case 114:  where();  break;
+    default:  break;
   }
 
   cmd=parseNumber('G',-1);
@@ -936,6 +937,7 @@ void setup() {
   motor_setup();
   motor_engage();
   tools_setup();
+  servo_init();
 
   //easyPWM_init();
   //SD_init();
